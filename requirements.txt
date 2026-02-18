@@ -1,0 +1,6 @@
+Django
+PostgreSQL
+tensorflow
+pytorch
+Docker
+# Add any other project dependencies here
