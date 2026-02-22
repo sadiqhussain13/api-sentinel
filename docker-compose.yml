@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:14
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: api_sentinel
+      POSTGRES_USER: sentinel
+      POSTGRES_PASSWORD: sentinel123
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinel"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      DEBUG: "True"
+      SECRET_KEY: dev-secret-key-change-in-production
+      DATABASE_URL: postgresql://sentinel:sentinel123@db:5432/api_sentinel
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery:
+    build: .
+    command: celery -A celery worker -l info
+    volumes:
+      - .:/app
+    environment:
+      DEBUG: "True"
+      SECRET_KEY: dev-secret-key-change-in-production
+      DATABASE_URL: postgresql://sentinel:sentinel123@db:5432/api_sentinel
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  celery-beat:
+    build: .
+    command: celery -A celery beat -l info
+    volumes:
+      - .:/app
+    environment:
+      DEBUG: "True"
+      SECRET_KEY: dev-secret-key-change-in-production
+      DATABASE_URL: postgresql://sentinel:sentinel123@db:5432/api_sentinel
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
